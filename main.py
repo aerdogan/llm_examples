@@ -1,6 +1,6 @@
 from functools import lru_cache
 from langchain_ollama import ChatOllama
-from langgraph.graph import StateGraph, MessagesState, START
+from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import tools_condition, ToolNode
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -33,12 +33,24 @@ def multiply(a: int, b: int) -> int:
     """
     return a * b
 
-tools = [multiply, calculate_factorial]
+def addition(a: int, b: int) -> int:
+    """Giriş a ile b toplamını verir
+
+    Parametreler:
+        a: ilk sayı
+        b: ikinci sayı
+
+    Sonuç:
+        int: Toplama sonucu
+    """
+    return a + b
+
+tools = [addition, multiply, calculate_factorial]
 model = ChatOllama(model="qwen2.5-coder")
 model_with_tools = model.bind_tools(tools)
 
 def math_llm(state):
-    msg_content = "Sen yardımsever bir matematik asistanısın."
+    msg_content = "Sen profesyonel bir matematik asistanısın. Sorulan işlemleri yapmak için her aşamada işlem araçlarını kullanmalısın."
     message = [SystemMessage(content=msg_content)] + state['messages']
     return {"messages": model_with_tools.invoke(message)}
 
@@ -47,11 +59,12 @@ graph.add_node("tools", ToolNode(tools))
 
 graph.add_edge(START, "math_llm")
 graph.add_edge("tools", "math_llm")
+graph.add_edge("tools", END)
 graph.add_conditional_edges("math_llm", tools_condition)
 
 agent = graph.compile()
 
-msg_content = "5 faktöriyelini hesapla ve 3 ile çarp."
+msg_content = "5 faktöriyelini hesapla, 3 ile çarp, sonra 8 ekle"
 state = {"messages": [HumanMessage(msg_content)]}
 
 resp = agent.invoke(state)
